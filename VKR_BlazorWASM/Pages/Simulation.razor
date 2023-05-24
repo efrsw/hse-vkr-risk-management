@@ -1,0 +1,165 @@
+﻿@page "/simulation"
+@using Models
+@inject StateContainer StateContainer
+
+<h3>Uploaded Project: @StateContainer.CurrentProject.ProjectName</h3>
+
+<RadzenDataGrid @ref="tasksGrid" Data="@StateContainer.CurrentProject.Tasks" TItem="PTask" AllowPaging="true" PageSize="5" Style="height:400px"
+                CellRender="@CellRender" RowUpdate="@OnUpdateRow" RowCreate="@OnCreateRow">
+    <Columns>
+        <RadzenDataGridColumn TItem="PTask" Property="Id" Title="Task Id" Frozen="true" Width="100px" />
+        <RadzenDataGridColumn TItem="PTask" Property="Description" Title="Task Description" Width="200px" Frozen="true" />
+        <RadzenDataGridColumn TItem="PTask" Property="Resources" Title="Task Resources">
+            <Template Context="ptask">
+                @(ptask.Resources
+                    .Select(p => p.RName)
+                    .Aggregate("", (curItem, nextItem) => curItem + " " + nextItem))
+            </Template>
+        </RadzenDataGridColumn>
+        <RadzenDataGridColumn TItem="PTask" Property="Duration" Title="Task Duration" />
+        <RadzenDataGridColumn TItem="PTask" Title="Task Predecessors" Property="Predecessors">
+            <Template Context="ptask">
+                @(ptask.Predecessors
+                    .Select(p => p.Description)
+                    .Aggregate("", (curItem, nextItem) => curItem + " " + nextItem))
+            </Template>
+        </RadzenDataGridColumn>
+        <RadzenDataGridColumn TItem="PTask" Title="Min Estimated Duration" Property="ExpectedDurationLowerBound">
+            <EditTemplate Context="ptask">
+                <RadzenNumeric @bind-Value="ptask.ExpectedDurationLowerBound" />
+            </EditTemplate>
+        </RadzenDataGridColumn>
+        <RadzenDataGridColumn TItem="PTask" Title="Max Estimated Duration" Property="ExpectedDurationUpperBound">
+            <EditTemplate Context="ptask">
+                <RadzenNumeric @bind-Value="ptask.ExpectedDurationUpperBound" />
+            </EditTemplate>
+        </RadzenDataGridColumn>
+        <RadzenDataGridColumn TItem="PTask" Context="order" Filterable="false" Sortable="false" TextAlign="TextAlign.Right" Width="156px">
+            <Template Context="ptask">
+                <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat" Size="ButtonSize.Medium" Click="@(args => EditRow(ptask))" @onclick:stopPropagation="true">
+                </RadzenButton>
+            </Template>
+            <EditTemplate Context="ptask">
+                <RadzenButton Icon="check" ButtonStyle="ButtonStyle.Success" Variant="Variant.Flat" Size="ButtonSize.Medium" Click="@((args) => SaveRow(ptask))">
+                </RadzenButton>
+                <RadzenButton Icon="close" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat" Size="ButtonSize.Medium" class="my-1 ms-1" Click="@((args) => CancelEdit(ptask))">
+                </RadzenButton>
+            </EditTemplate>
+        </RadzenDataGridColumn>
+    </Columns>
+</RadzenDataGrid>
+
+<RadzenCard Class="rz-mt-5">
+    <RadzenStack Orientation="Orientation.Horizontal">
+        <RadzenButton Click="@FindCriticalPath" Text="Find critical activities"
+                      Style="width:250px"
+                      Visible=@(StateContainer.CurrentProject.ProjectName != "") />
+        <RadzenFileInput class="w-100"
+                         TValue="string"
+                         Accept="text/csv"
+                         @bind-FileName="projectName"
+                         @bind-Value="projectStr"
+                         Change=@(args => OnChange(args)) />
+    </RadzenStack>
+</RadzenCard>
+
+<RadzenCard Class="rz-mt-5" Visible=@(StateContainer.CurrentProject.Tasks.Where(x => x.Slack == 0).Count() > 0)>
+    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center">
+        <RadzenButton Click="@ConductSimulations" Text="Conduct Simulations" Style="width:250px" />
+        <RadzenRadioButtonList @bind-Value=@StateContainer.CurrentSimulation.DistributionType TValue="int" class="w-100">
+            <Items>
+                <RadzenRadioButtonListItem Text="Use Normal Distribution" Value="1" />
+                <RadzenRadioButtonListItem Text="Use Beta Distribution" Value="2" />
+                <RadzenRadioButtonListItem Text="Use Triangular Distribution" Value="3" />
+            </Items>
+        </RadzenRadioButtonList>
+        <RadzenStack>
+            <RadzenText>Number of trials:</RadzenText>
+            <RadzenNumeric @bind-Value="@StateContainer.CurrentSimulation.NumberOfSimulations" />
+        </RadzenStack>
+        <RadzenStack>
+            <RadzenText>Number of bins in Histogram:</RadzenText>
+            <RadzenNumeric @bind-Value="@StateContainer.CurrentSimulation.NumberOfBins" />
+        </RadzenStack>
+    </RadzenStack>
+</RadzenCard>
+
+@code {
+    List<PTask> criticalTasks = new();
+    PTask taskToInsert;
+    PTask taskToUpdate;
+    RadzenDataGrid<PTask> tasksGrid;
+    string projectStr;
+    string projectName;
+
+    void ConductSimulations()
+    {
+        StateContainer.CurrentSimulation.SimulationProject = StateContainer.CurrentProject;
+        StateContainer.CurrentSimulation.SimulateOutcomes();
+    }
+
+    void FindCriticalPath()
+    {
+        criticalTasks = StateContainer.CurrentProject.GetCriticalPath();
+    }
+
+    void CellRender(DataGridCellRenderEventArgs<PTask> args)
+    {
+        args.Attributes.Add("style", $"background-color: {(args.Data.Slack == 0 ? "var(--rz-success)" : "var(--rz-base-background-color)")};");
+    }
+
+    void OnChange(string value)
+    {
+        if (value is not null)
+        {
+            var decodedLines = Utils.Base64ToString(value.Split(',')[1]).Split('\n');
+            StateContainer.CurrentProject = Project.ReadProjectFromCsv(decodedLines, projectName);
+        }
+        else
+        {
+            StateContainer.CurrentProject = new();
+            List<PTask> criticalTasks = new();
+            Console.WriteLine("Input cleared");
+            Console.WriteLine(criticalTasks.Count);
+        }
+    }
+
+    async Task EditRow(PTask pTask)
+    {
+        taskToUpdate = pTask;
+        await tasksGrid.EditRow(pTask);
+    }
+
+    void OnUpdateRow(PTask pTask)
+    {
+        if (pTask == taskToInsert)
+        {
+            taskToInsert = null;
+        }
+
+        var _idx = StateContainer.CurrentProject.Tasks.FindIndex(p => p.Id == pTask.Id);
+
+        if (_idx != -1)
+            StateContainer.CurrentProject.Tasks[_idx] = taskToUpdate;
+
+        taskToUpdate = null;
+
+        Console.WriteLine("Triggered!");
+    }
+
+    async Task SaveRow(PTask pTask)
+    {
+        await tasksGrid.UpdateRow(pTask);
+    }
+
+    void CancelEdit(PTask order)
+    {
+
+    }
+
+    void OnCreateRow(PTask pTask)
+    {
+        StateContainer.CurrentProject.Tasks.Add(pTask);
+        taskToInsert = null;
+    }
+}

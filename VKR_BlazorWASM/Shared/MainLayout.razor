@@ -1,0 +1,24 @@
+﻿@inherits LayoutComponentBase
+@inject StateContainer StateContainer
+
+<RadzenLayout>
+    <RadzenHeader>
+        <RadzenMenu>
+            <RadzenMenuItem Text="Risk Dashboard" Path="dashboard" Icon="dashboard" />
+            <RadzenMenuItem Text="Simulation" Path="simulation" Icon="assessment" />
+        </RadzenMenu>
+    </RadzenHeader>
+    <RadzenBody>
+        <div class="rz-p-4">
+            @Body
+        </div>
+    </RadzenBody>
+    <RadzenFooter>
+        Fursov Egor 1901
+    </RadzenFooter>
+</RadzenLayout>
+
+<RadzenDialog />
+<RadzenNotification />
+<RadzenContextMenu />
+<RadzenTooltip />

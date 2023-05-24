@@ -1,0 +1,114 @@
+﻿@page "/projectdata"
+@using Models
+@inject StateContainer StateContainer
+
+
+<RadzenText TextStyle="TextStyle.Subtitle2"
+            TagName="TagName.H3">
+    Select .csv project file
+</RadzenText>
+
+<RadzenFileInput class="w-100"
+                 TValue="string"
+                 Accept="text/csv"
+                 @bind-FileName="projectName"
+                 @bind-Value="projectStr"
+                 Change=@(args => OnChange(args)) />
+
+@if (StateContainer.CurrentProject.ProjectName != "")
+{
+    <RadzenCard Class="rz-mt-5">
+        <RadzenText TextStyle="TextStyle.Subtitle2"
+                TagName="TagName.H3">
+            Project Name: @(StateContainer.CurrentProject.ProjectName != ""
+        ? StateContainer.CurrentProject.ProjectName
+        : "No file selected")
+        </RadzenText>
+
+        <RadzenDataGrid Data="@StateContainer.CurrentProject.Tasks" TItem="PTask">
+            <Columns>
+                <RadzenDataGridColumn TItem="PTask" Property="Id" Title="Task Id" Frozen="true" Width="100px" />
+                <RadzenDataGridColumn TItem="PTask" Property="Description" Title="Task Description" Width="200px" Frozen="true" />
+                <RadzenDataGridColumn TItem="PTask" Property="Duration" Title="Task Duration" />
+                <RadzenDataGridColumn TItem="PTask" Title="Task Predecessors" Property="Predecessors">
+                    <Template Context="ptask">
+                        @(ptask.Predecessors
+                            .Select(p => p.Description)
+                            .Aggregate("", (curItem, nextItem) => curItem + " " + nextItem))
+                    </Template>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+    </RadzenCard>
+}
+
+
+@code {
+    private string projectStr;
+    private string projectName;
+
+    PTask taskToInsert;
+    PTask taskToUpdate;
+
+    RadzenDataGrid<PTask> tasksGrid;
+
+    void OnChange(string value)
+    {
+        if (value is not null)
+        {
+            var decodedLines = Utils.Base64ToString(value.Split(',')[1]).Split('\n');
+            StateContainer.CurrentProject = Project.ReadProjectFromCsv(decodedLines, projectName);
+            Console.WriteLine(StateContainer.CurrentProject.Tasks.Count);
+        }
+        else
+        {
+            StateContainer.CurrentProject = new Project();
+            Console.WriteLine("Input cleared");
+        }
+    }
+
+    async Task InsertRow()
+    {
+        taskToInsert = new PTask();
+        await tasksGrid.InsertRow(taskToInsert);
+    }
+
+    async Task EditRow(PTask pTask)
+    {
+        taskToUpdate = pTask;
+        await tasksGrid.EditRow(pTask);
+    }
+
+    void OnUpdateRow(PTask pTask)
+    {
+        if (pTask == taskToInsert)
+        {
+            taskToInsert = null;
+        }
+
+        var _idx = StateContainer.CurrentProject.Tasks.FindIndex(p => p.Id == pTask.Id);
+
+        if (_idx != -1)
+            StateContainer.CurrentProject.Tasks[_idx] = taskToUpdate;
+
+        taskToUpdate = null;
+
+        Console.WriteLine("Triggered!");
+    }
+
+    async Task SaveRow(PTask pTask)
+    {
+        await tasksGrid.UpdateRow(pTask);
+    }
+
+    void CancelEdit(PTask order)
+    {
+
+    }
+
+    void OnCreateRow(PTask pTask)
+    {
+        StateContainer.CurrentProject.Tasks.Add(pTask);
+        taskToInsert = null;
+    }
+}

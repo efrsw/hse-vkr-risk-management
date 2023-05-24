@@ -1,0 +1,41 @@
+﻿@page "/dashboard"
+@inject StateContainer StateContainer
+
+<h3>Dashboard</h3>
+
+<RadzenTabs TabPosition="TabPosition.Top" RenderMode="TabRenderMode.Client">
+    <Tabs>
+        <RadzenTabsItem Text="Simulation Histogram">
+            <h4>Distribution of time</h4>
+            <RadzenChart>
+                <RadzenColumnSeries Data="@StateContainer.CurrentSimulation.SimulationData"
+                                    Title="@StateContainer.CurrentProject.ProjectName"
+                                    CategoryProperty="Bin"
+                                    ValueProperty="Amount" />
+            </RadzenChart>
+            @if (StateContainer.CurrentSimulation.SuccessProbability <= 0.85
+            && StateContainer.CurrentSimulation.SuccessProbability >= 0.65)
+            {
+                <RadzenAlert AllowClose="false" AlertStyle="AlertStyle.Warning" Variant="Variant.Flat" Shade="Shade.Lighter">
+                    The probability of fininshing project within the deadline is @(StateContainer.CurrentSimulation.SuccessProbability * 100)%
+                </RadzenAlert>
+            }
+            else if (StateContainer.CurrentSimulation.SuccessProbability <= 0.65)
+            {
+                <RadzenAlert AllowClose="false" AlertStyle="AlertStyle.Danger" Variant="Variant.Flat" Shade="Shade.Lighter">
+                    The probability of fininshing project within the deadline is @(StateContainer.CurrentSimulation.SuccessProbability * 100)%
+                </RadzenAlert>
+            }
+            else
+            {
+                <RadzenAlert AllowClose="false" AlertStyle="AlertStyle.Success" Variant="Variant.Flat" Shade="Shade.Lighter">
+                    The probability of fininshing project within the deadline is @(StateContainer.CurrentSimulation.SuccessProbability * 100)%
+                </RadzenAlert>
+            }
+        </RadzenTabsItem>
+    </Tabs>
+</RadzenTabs>
+
+@code {
+
+}
