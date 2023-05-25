@@ -9,13 +9,6 @@
     <Columns>
         <RadzenDataGridColumn TItem="PTask" Property="Id" Title="Task Id" Frozen="true" Width="100px" />
         <RadzenDataGridColumn TItem="PTask" Property="Description" Title="Task Description" Width="200px" Frozen="true" />
-        <RadzenDataGridColumn TItem="PTask" Property="Resources" Title="Task Resources">
-            <Template Context="ptask">
-                @(ptask.Resources
-                    .Select(p => p.RName)
-                    .Aggregate("", (curItem, nextItem) => curItem + " " + nextItem))
-            </Template>
-        </RadzenDataGridColumn>
         <RadzenDataGridColumn TItem="PTask" Property="Duration" Title="Task Duration" />
         <RadzenDataGridColumn TItem="PTask" Title="Task Predecessors" Property="Predecessors">
             <Template Context="ptask">
